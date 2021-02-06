@@ -1,11 +1,10 @@
-import os
-
+# import os
 import torch
 from torch.nn import functional as F
-from torch.autograd import Function
-from torch.utils.cpp_extension import load
+# from torch.autograd import Function
+# from torch.utils.cpp_extension import load
 
-
+'''
 module_path = os.path.dirname(__file__)
 upfirdn2d_op = load(
     "upfirdn2d",
@@ -141,7 +140,7 @@ class UpFirDn2d(Function):
 
         return grad_input, None, None, None, None
 
-
+'''
 def upfirdn2d(input, kernel, up=1, down=1, pad=(0, 0)):
     if input.device.type == "cpu":
         out = upfirdn2d_native(
@@ -149,9 +148,9 @@ def upfirdn2d(input, kernel, up=1, down=1, pad=(0, 0)):
         )
 
     else:
-        out = UpFirDn2d.apply(
-            input, kernel, (up, up), (down, down), (pad[0], pad[1], pad[0], pad[1])
-        )
+        # out = UpFirDn2d.apply( input, kernel, (up, up), (down, down), (pad[0], pad[1], pad[0], pad[1]) )
+        print('cpu only version')
+        out = input
 
     return out
 

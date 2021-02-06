@@ -47,17 +47,21 @@ struct UpFirDn2DKernelParams {
 };
 
 template <typename scalar_t>
-__global__ void upfirdn2d_kernel_large(scalar_t *out, const scalar_t *input,
-                                       const scalar_t *kernel,
-                                       const UpFirDn2DKernelParams p) {
-  int minor_idx = blockIdx.x * blockDim.x + threadIdx.x;
+__global__ void upfirdn2d_kernel_large(scalar_t *out, const scalar_t *input, const scalar_t *kernel, const UpFirDn2DKernelParams p) {
+
+  /**
+  threadIdx -- координаты потока в блоке потоков
+  blockIdx  -- координаты блока потоков в сетке
+  blockDim  -- размер блока потоков
+  */
+
+  int minor_idx = blockIdx.x * blockDim.x + threadIdx.x; //  id потока в сетке потоков по х
   int out_y = minor_idx / p.minor_dim;
   minor_idx -= out_y * p.minor_dim;
   int out_x_base = blockIdx.y * p.loop_x * blockDim.y + threadIdx.y;
   int major_idx_base = blockIdx.z * p.loop_major;
 
-  if (out_x_base >= p.out_w || out_y >= p.out_h ||
-      major_idx_base >= p.major_dim) {
+  if (out_x_base >= p.out_w || out_y >= p.out_h || major_idx_base >= p.major_dim) {
     return;
   }
 
@@ -66,20 +70,17 @@ __global__ void upfirdn2d_kernel_large(scalar_t *out, const scalar_t *input,
   int h = min(max(floor_div(mid_y + p.kernel_h, p.up_y), 0), p.in_h) - in_y;
   int kernel_y = mid_y + p.kernel_h - (in_y + 1) * p.up_y;
 
-  for (int loop_major = 0, major_idx = major_idx_base;
-       loop_major < p.loop_major && major_idx < p.major_dim;
-       loop_major++, major_idx++) {
-    for (int loop_x = 0, out_x = out_x_base;
-         loop_x < p.loop_x && out_x < p.out_w; loop_x++, out_x += blockDim.y) {
+  for (int loop_major = 0, major_idx = major_idx_base; loop_major < p.loop_major && major_idx < p.major_dim; loop_major++, major_idx++) {
+    for (int loop_x = 0, out_x = out_x_base; loop_x < p.loop_x && out_x < p.out_w; loop_x++, out_x += blockDim.y) {
+
       int mid_x = out_x * p.down_x + p.up_x - 1 - p.pad_x0;
       int in_x = min(max(floor_div(mid_x, p.up_x), 0), p.in_w);
       int w = min(max(floor_div(mid_x + p.kernel_w, p.up_x), 0), p.in_w) - in_x;
       int kernel_x = mid_x + p.kernel_w - (in_x + 1) * p.up_x;
 
-      const scalar_t *x_p =
-          &input[((major_idx * p.in_h + in_y) * p.in_w + in_x) * p.minor_dim +
-                 minor_idx];
+      const scalar_t *x_p = &input[((major_idx * p.in_h + in_y) * p.in_w + in_x) * p.minor_dim + minor_idx];
       const scalar_t *k_p = &kernel[kernel_y * p.kernel_w + kernel_x];
+
       int x_px = p.minor_dim;
       int k_px = -p.up_x;
       int x_py = p.in_w * p.minor_dim;
@@ -98,17 +99,16 @@ __global__ void upfirdn2d_kernel_large(scalar_t *out, const scalar_t *input,
         k_p += k_py - w * k_px;
       }
 
-      out[((major_idx * p.out_h + out_y) * p.out_w + out_x) * p.minor_dim +
-          minor_idx] = v;
+      out[((major_idx * p.out_h + out_y) * p.out_w + out_x) * p.minor_dim + minor_idx] = v;
     }
   }
 }
 
-template <typename scalar_t, int up_x, int up_y, int down_x, int down_y,
-          int kernel_h, int kernel_w, int tile_out_h, int tile_out_w>
-__global__ void upfirdn2d_kernel(scalar_t *out, const scalar_t *input,
-                                 const scalar_t *kernel,
-                                 const UpFirDn2DKernelParams p) {
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+template <typename scalar_t, int up_x, int up_y, int down_x, int down_y, int kernel_h, int kernel_w, int tile_out_h, int tile_out_w>
+__global__ void upfirdn2d_kernel(scalar_t *out, const scalar_t *input, const scalar_t *kernel, const UpFirDn2DKernelParams p) {
+
   const int tile_in_h = ((tile_out_h - 1) * down_y + kernel_h - 1) / up_y + 1;
   const int tile_in_w = ((tile_out_w - 1) * down_x + kernel_w - 1) / up_x + 1;
 
@@ -192,6 +192,7 @@ __global__ void upfirdn2d_kernel(scalar_t *out, const scalar_t *input,
 
 #pragma unroll
         for (int y = 0; y < kernel_h / up_y; y++)
+
 #pragma unroll
           for (int x = 0; x < kernel_w / up_x; x++)
             v += sx[rel_in_y + y][rel_in_x + x] *
@@ -234,56 +235,47 @@ torch::Tensor upfirdn2d_op(const torch::Tensor &input,
   p.pad_y0 = pad_y0;
   p.pad_y1 = pad_y1;
 
-  p.out_h = (p.in_h * p.up_y + p.pad_y0 + p.pad_y1 - p.kernel_h + p.down_y) /
-            p.down_y;
-  p.out_w = (p.in_w * p.up_x + p.pad_x0 + p.pad_x1 - p.kernel_w + p.down_x) /
-            p.down_x;
+  p.out_h = (p.in_h * p.up_y + p.pad_y0 + p.pad_y1 - p.kernel_h + p.down_y) / p.down_y;
+  p.out_w = (p.in_w * p.up_x + p.pad_x0 + p.pad_x1 - p.kernel_w + p.down_x) / p.down_x;
 
-  auto out =
-      at::empty({p.major_dim, p.out_h, p.out_w, p.minor_dim}, x.options());
+  auto out = at::empty({p.major_dim, p.out_h, p.out_w, p.minor_dim}, x.options());
 
   int mode = -1;
 
   int tile_out_h = -1;
   int tile_out_w = -1;
 
-  if (p.up_x == 1 && p.up_y == 1 && p.down_x == 1 && p.down_y == 1 &&
-      p.kernel_h <= 4 && p.kernel_w <= 4) {
+  if (p.up_x == 1 && p.up_y == 1 && p.down_x == 1 && p.down_y == 1 && p.kernel_h <= 4 && p.kernel_w <= 4) {
     mode = 1;
     tile_out_h = 16;
     tile_out_w = 64;
   }
 
-  if (p.up_x == 1 && p.up_y == 1 && p.down_x == 1 && p.down_y == 1 &&
-      p.kernel_h <= 3 && p.kernel_w <= 3) {
+  if (p.up_x == 1 && p.up_y == 1 && p.down_x == 1 && p.down_y == 1 && p.kernel_h <= 3 && p.kernel_w <= 3) {
     mode = 2;
     tile_out_h = 16;
     tile_out_w = 64;
   }
 
-  if (p.up_x == 2 && p.up_y == 2 && p.down_x == 1 && p.down_y == 1 &&
-      p.kernel_h <= 4 && p.kernel_w <= 4) {
+  if (p.up_x == 2 && p.up_y == 2 && p.down_x == 1 && p.down_y == 1 && p.kernel_h <= 4 && p.kernel_w <= 4) {
     mode = 3;
     tile_out_h = 16;
     tile_out_w = 64;
   }
 
-  if (p.up_x == 2 && p.up_y == 2 && p.down_x == 1 && p.down_y == 1 &&
-      p.kernel_h <= 2 && p.kernel_w <= 2) {
+  if (p.up_x == 2 && p.up_y == 2 && p.down_x == 1 && p.down_y == 1 && p.kernel_h <= 2 && p.kernel_w <= 2) {
     mode = 4;
     tile_out_h = 16;
     tile_out_w = 64;
   }
 
-  if (p.up_x == 1 && p.up_y == 1 && p.down_x == 2 && p.down_y == 2 &&
-      p.kernel_h <= 4 && p.kernel_w <= 4) {
+  if (p.up_x == 1 && p.up_y == 1 && p.down_x == 2 && p.down_y == 2 &&  p.kernel_h <= 4 && p.kernel_w <= 4) {
     mode = 5;
     tile_out_h = 8;
     tile_out_w = 32;
   }
 
-  if (p.up_x == 1 && p.up_y == 1 && p.down_x == 2 && p.down_y == 2 &&
-      p.kernel_h <= 2 && p.kernel_w <= 2) {
+  if (p.up_x == 1 && p.up_y == 1 && p.down_x == 2 && p.down_y == 2 && p.kernel_h <= 2 && p.kernel_w <= 2) {
     mode = 6;
     tile_out_h = 8;
     tile_out_w = 32;

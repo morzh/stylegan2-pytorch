@@ -28,6 +28,7 @@ def generate(args, g_ema, device, mean_latent):
 
 if __name__ == "__main__":
     device = "cuda"
+    # device = "cpu"
 
     parser = argparse.ArgumentParser(description="Generate samples from the generator")
 
@@ -68,9 +69,7 @@ if __name__ == "__main__":
     args.latent = 512
     args.n_mlp = 8
 
-    g_ema = Generator(
-        args.size, args.latent, args.n_mlp, channel_multiplier=args.channel_multiplier
-    ).to(device)
+    g_ema = Generator(args.size, args.latent, args.n_mlp, channel_multiplier=args.channel_multiplier).to(device)
     checkpoint = torch.load(args.ckpt)
 
     g_ema.load_state_dict(checkpoint["g_ema"])

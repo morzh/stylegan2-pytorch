@@ -82,19 +82,15 @@ class Blur(nn.Module):
             kernel = kernel * (upsample_factor ** 2)
 
         self.register_buffer("kernel", kernel)
-
         self.pad = pad
 
     def forward(self, input):
         out = upfirdn2d(input, self.kernel, pad=self.pad)
-
         return out
 
 
 class EqualConv2d(nn.Module):
-    def __init__(
-        self, in_channel, out_channel, kernel_size, stride=1, padding=0, bias=True
-    ):
+    def __init__(self, in_channel, out_channel, kernel_size, stride=1, padding=0, bias=True):
         super().__init__()
 
         self.weight = nn.Parameter(
@@ -107,19 +103,11 @@ class EqualConv2d(nn.Module):
 
         if bias:
             self.bias = nn.Parameter(torch.zeros(out_channel))
-
         else:
             self.bias = None
 
     def forward(self, input):
-        out = F.conv2d(
-            input,
-            self.weight * self.scale,
-            bias=self.bias,
-            stride=self.stride,
-            padding=self.padding,
-        )
-
+        out = F.conv2d(input, self.weight * self.scale, bias=self.bias, stride=self.stride, padding=self.padding)
         return out
 
     def __repr__(self):
@@ -130,9 +118,7 @@ class EqualConv2d(nn.Module):
 
 
 class EqualLinear(nn.Module):
-    def __init__(
-        self, in_dim, out_dim, bias=True, bias_init=0, lr_mul=1, activation=None
-    ):
+    def __init__(self, in_dim, out_dim, bias=True, bias_init=0, lr_mul=1, activation=None):
         super().__init__()
 
         self.weight = nn.Parameter(torch.randn(out_dim, in_dim).div_(lr_mul))
@@ -154,9 +140,7 @@ class EqualLinear(nn.Module):
             out = fused_leaky_relu(out, self.bias * self.lr_mul)
 
         else:
-            out = F.linear(
-                input, self.weight * self.scale, bias=self.bias * self.lr_mul
-            )
+            out = F.linear(input, self.weight * self.scale, bias=self.bias * self.lr_mul)
 
         return out
 
