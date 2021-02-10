@@ -7,17 +7,19 @@ import time
 
 latent = 512
 n_mlp = 8
-size = 1024
+size = 512
 channel_multiplier = 2
 truncation = 1
 truncation_mean = 4096
 rand_sample = 1
+num_samples = 100
 
-ckpt = '/home/morzh/work/stylegan2-pytorch/checkpoint/stylegan2-ffhq-config-f.pt'
+ckpt = '/home/morzh/Downloads/stylegan-1024px-new.model'
+# ckpt = '/home/morzh/work/stylegan2-pytorch/checkpoint/stylegan2-ffhq-config-f.pt'
 
 device = torch.device("cpu")
 g_ema = Generator(size, latent, n_mlp, channel_multiplier=channel_multiplier).to(device)
-checkpoint = torch.load(ckpt)
+checkpoint = torch.load(ckpt, map_location=device)
 
 g_ema.load_state_dict(checkpoint["g_ema"])
 
@@ -30,7 +32,7 @@ else:
 
 with torch.no_grad():
     g_ema.eval()
-    for i in range(100):
+    for i in range(num_samples):
         sample_z = torch.randn(rand_sample, latent, device=device)
         time_start = time.time()
         sample, _ = g_ema([sample_z], truncation=truncation, truncation_latent=mean_latent)
@@ -38,9 +40,7 @@ with torch.no_grad():
 
         print('time for inference is', time_end-time_start, 'seconds')
         img = sample[0].permute(1, 2, 0)
-        img += 1.0
-        img /= 2.0
-        # plt.imshow(img.to(torch.uint8))
+        img = (img + 1.0) / 2.0
         plt.figure(figsize=(20, 10))
         plt.imshow(img)
         plt.tight_layout()
